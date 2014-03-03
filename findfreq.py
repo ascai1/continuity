@@ -1,5 +1,4 @@
 #!/usr/bin/python
-import scipy.io.wavfile as wav
 from numpy import copy, real
 from scipy import fft
 from pylab import plot, subplot, show, xlim, ylim, axis, autoscale
@@ -50,9 +49,9 @@ def main():
 		# step 7: given FFT peaks, calculate actual peak frequencies
 		show_sig(rtransform, i*interval, (i+1)*interval, rate, subsample)
 
+def get_regions(rate,sample,num_max_regions):
+	output = list()
 
-def corr_main():
-	(rate, sample) = wav.read(sys.argv[1])
 	sample = sample/(2.0**15)
 	intpersec = 100
 	interval = rate/intpersec
@@ -99,11 +98,9 @@ def corr_main():
 			samplebuf.flush()
 		elif max_cor is not None and max_cor < 0.27:
 			if len(buffer_waveform) > rate/12:
-				samplebuf.print_info(i*interval, subsample, norm_correlation, delta=10)
-				sys.stdout.flush()
-				samplebuf.plot(i*interval, subsample, norm_correlation)
+				output.append((i*interval-len(buffer_waveform),buffer_waveform))
+				if num_max_regions is not None and num_max_regions == len(output):
+					break
 			samplebuf.flush()
 
-if __name__ == '__main__':
-	#main()
-	corr_main()
+	return output
