@@ -7,7 +7,7 @@ from scipy import fft
 
 def corr_main():
 	(rate, sample) = wav.read(sys.argv[1])
-	regions = get_regions(rate, sample,20)
+	regions = get_regions(rate, sample,400)
 	for start, region in regions:
 		print start/float(rate), (start + len(region))/float(rate)
 

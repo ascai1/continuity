@@ -5,7 +5,8 @@ from pylab import plot, subplot, show, xlim, ylim, axis, autoscale
 import sys
 import operator
 from samplebuffer import SampleBuffer
-from analysisutils import smooth, correlation, get_subsample
+from analysisutils import smooth, correlation, get_subsample, midsection
+from math import sqrt
 
 
 def show_sig(rtransform, start, end, rate, subsample):
@@ -58,11 +59,8 @@ def get_regions(rate,sample,num_max_regions):
 
 	subsample = None
 	samplebuf = SampleBuffer(rate)
-	for i in xrange(len(sample)/interval):
-		# save previous subsample
-		if subsample is not None:
-			samplebuf.append(subsample)
 
+	for i in xrange(len(sample)/interval):
 		# get new subsample, do not apply any windows
 		subsample = get_subsample(sample, i*interval, (i+1)*interval, window=False)
 		buffer_waveform = samplebuf.get_arr()
@@ -76,31 +74,30 @@ def get_regions(rate,sample,num_max_regions):
 				current_waveform = subsample[len(subsample)/2:]
 
 			if buffer_waveform is not None:
+				# truncate the buffer to avoid calculating with the entire stored waveform
+				trunc_buffer_waveform = midsection(buffer_waveform, len(current_waveform)*4)
 				# get the correlation between current subsample and previous subsample data
-				norm_correlation = copy(real(correlation(buffer_waveform, current_waveform)))
+				norm_correlation = copy(real(correlation(trunc_buffer_waveform, current_waveform)))
+				# normalize by dividing by geometric mean of waveform energies
+				# www-prima.imag.fr/jlc/papers/IAS95-martin.pdf
+				norm_factor = sum(b**2 for b in trunc_buffer_waveform)
+				norm_factor = sqrt(norm_factor*sum(c**2 for c in current_waveform))
+
 				# chop off data from the end when the subsample is wrapping around the previous data
 				# TODO: verify that this is not wrapping the previous subsample data around current subsample
-				norm_correlation.resize(len(norm_correlation) - len(current_waveform))
+				max_cor = max(norm_correlation[:-len(current_waveform)])/norm_factor
 
-				# get the index and magnitude of maximum correlation
-				(max_cor_i, max_cor) = max(enumerate(norm_correlation), key=lambda x: x[1])
-
-				# at the index of max correlation, get the maximum possible value for the correlation
-				# given each of the waveforms involved
-				norm_factor = sum(b**2 for b in buffer_waveform[max_cor_i:max_cor_i+len(current_waveform)])
-				norm_factor = max(norm_factor, sum(c**2 for c in current_waveform))
-				# normalize the correlation as a fraction of the maximum possible correlation
-				norm_correlation = norm_correlation/norm_factor
-				max_cor = max_cor/norm_factor
-
-		if subsample is None and buffer_waveform is not None:
-			#samplebuf.print_info(i*interval, delta=5)
-			samplebuf.flush()
-		elif max_cor is not None and max_cor < 0.27:
-			if len(buffer_waveform) > rate/12:
+		end_period = subsample is None and buffer_waveform is not None
+		end_period = end_period or max_cor is not None and max_cor < 0.35
+		if end_period:
+			if len(buffer_waveform) > len(current_waveform) * 4:
 				output.append((i*interval-len(buffer_waveform),buffer_waveform))
 				if num_max_regions is not None and num_max_regions == len(output):
 					break
 			samplebuf.flush()
+
+		# save previous subsample
+		if subsample is not None:
+			samplebuf.append(subsample)
 
 	return output

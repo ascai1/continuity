@@ -7,8 +7,8 @@ def get_subsample(sample, start, end, window):
 	end = min(len(sample),end)
 
 	if not window:
-		return copy(sample[start:end,0])
-	return triangle_window(sample[start:end,0])
+		return copy(sample[start:end])
+	return triangle_window(sample[start:end])
 
 def zero_padded(arr, start, end):
 	for i in xrange(start, end):
@@ -74,3 +74,7 @@ def get_padded_waveform(n, nz, period):
 	w[:nz] = sin(arange(nz)*2*pi/float(period))
 	return w
 
+def midsection(arr, size):
+	if size >= len(arr):
+		return arr
+	return arr[(len(arr)-size)/2:(len(arr)+size)/2]
